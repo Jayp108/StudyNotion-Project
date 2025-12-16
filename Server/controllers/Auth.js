@@ -95,10 +95,20 @@ exports.signup = async (req, res) => {
     const {firstName, lastName, email, password,
          confirmPassword, accountType,contactNumber,otp} = req.body;
 
+    console.log("Signup Request Body:", req.body);
+
     if(!firstName || !lastName || !email || !password || !confirmPassword || !otp){
-       return res.status(401).json({
+       return res.status(400).json({
             success:false,
             message:"All fields are required",
+            missingFields: {
+                firstName: !firstName,
+                lastName: !lastName,
+                email: !email,
+                password: !password,
+                confirmPassword: !confirmPassword,
+                otp: !otp
+            }
         });
     }
 
@@ -106,6 +116,7 @@ exports.signup = async (req, res) => {
 
     //  password validation
     if(password !== confirmPassword){
+        console.log("Password mismatch:", { password, confirmPassword });
         return res.status(400).json({
             success:false,
             message:"Password do not match",
@@ -114,6 +125,7 @@ exports.signup = async (req, res) => {
 
     // check if user already exists or not 
      const existingUser = await User.findOne({email});
+     console.log("Existing user check:", { email, existingUser: !!existingUser });
      if(existingUser){
         return res.status(400).json({
             success:false,
@@ -123,6 +135,7 @@ exports.signup = async (req, res) => {
 
         //  Recent otp Used for Signup
         const recentOtp = await OTP.find({ email }).sort({ createdAt: -1}).limit(1);
+        console.log("OTP validation:", { requestOtp: otp, dbOtp: recentOtp[0]?.otp, found: recentOtp.length > 0 });
 
         if(recentOtp.length === 0){
             return res.status(400).json({
@@ -212,7 +225,7 @@ exports.login = async (req, res) => {
                 // accountType:user.accountType,
             }
             const token = jwt.sign(payload, process.env.JWT_SECRET,{
-                expiresIn:"2h",
+                expiresIn:"24h",
             });
             user.token = token;
             user.password = undefined;

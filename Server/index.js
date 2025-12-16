@@ -5,6 +5,7 @@ const userRoutes = require("./routes/User");
 const profileRoutes = require("./routes/Profile");
 const paymentRoutes = require("./routes/Payment");
 const courseRoutes = require("./routes/Course");
+const contactRoutes = require("./routes/Contact");
 
 
 const database = require("./config/database");
@@ -25,7 +26,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(
     cors({
-        origin:"http://location:3000",
+        origin:"http://localhost:5173",
         credentials:true,
     })
 )
@@ -45,9 +46,10 @@ app.use("/api/v1/auth", userRoutes);
 app.use("/api/v1/profile", profileRoutes);
 app.use("/api/v1/course", courseRoutes);
 app.use("/api/v1/payment", paymentRoutes);
+app.use("/api/v1/reach", contactRoutes);
 
 
-// def route
+// def route 
 
 app.get("/", (req, res) =>{
     return res.json({

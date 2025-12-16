@@ -8,7 +8,7 @@ exports.auth = async (req, res, next) =>{
     try{
         const token = req.cookies.token 
         || req.body.token 
-        || req.header("Authorization").replace("Bearer", "");
+        || (req.header("Authorization") ? req.header("Authorization").replace("Bearer ", "").trim() : null);
 
         // if token missing , then return response
         if(!token){
@@ -27,7 +27,7 @@ exports.auth = async (req, res, next) =>{
         catch(error){
             return res.status(401).json({
                 success:false,
-                message:'token is invalid',
+                message: error.name === 'TokenExpiredError' ? 'Token has expired. Please login again.' : 'Token is invalid',
             });
         }
         next();
@@ -63,10 +63,12 @@ exports.isStudent = async (req, res, next) =>{
 //  isInstructor
 exports.isInstructor = async (req, res, next) =>{
     try{
+        console.log("isInstructor middleware - User account type:", req.user.accountType);
         if(req.user.accountType !== "Instructor"){
             return res.status(401).json({
                 success:false,
                 message:"This is a protected route for Instructor only",
+                userAccountType: req.user.accountType
             });
         }
         next();

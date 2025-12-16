@@ -4,6 +4,11 @@ const Category = require("../models/category");
 const User = require("../models/User");
 const {uploadImageToCloudinary} = require("../utils/imageUploader");
 const category = require("../models/category");
+const RatingAndReview = require("../models/RatingAndReview");
+const Section = require("../models/Section");
+const SubSection = require("../models/SubSection");
+const CourseProgress = require("../models/CourseProgress");
+const { convertSecondsToDuration } = require("../utils/secToDuration");
 
 
 // createCourse handler functin
@@ -57,6 +62,8 @@ exports.createCourse = async (req, res) =>{
                 price,
                 category:categoryDetails._id,
                 thumbnail:thumbnailImage.secure_url,
+                status: "Published",
+                tag: [],
             });
 
 
@@ -102,22 +109,27 @@ exports.createCourse = async (req, res) =>{
     }
 };
 
-
-
-
-
 // Get allcourses handler function
 
 exports.getAllCourses = async (req, res) =>{
     try{
-        const allCourses = await Course.find({}, {courseName:true,
-                                 price:true,
-                                 thumbnail:true,
-                                 instructor:true,
-                                 ratingAndReviews:true,
-                                 studentsEnrolled:true,})
-                                 .populate("instructor")
-                                 .exec();
+        const allCourses = await Course.find(
+            { status: "Published" },
+            {
+                courseName: true,
+                courseDescription: true,
+                price: true,
+                thumbnail: true,
+                instructor: true,
+                ratingAndReviews: true,
+                studentsEnrolled: true,
+                category: true,
+                tag: true,
+            }
+        )
+        .populate("instructor")
+        .populate("category")
+        .exec();
 
         return res.status(200).json({
             success:true,
@@ -189,7 +201,6 @@ exports.getCourseDetails = async(req, res) =>{
     }
 }
 
-
                   // getFullCourseDetails 
 
 exports.getFullCourseDetails = async (req, res) => {
@@ -210,7 +221,7 @@ exports.getFullCourseDetails = async (req, res) => {
       .populate({
         path: "courseContent",
         populate: {
-          path: "subSection",
+          path: "SubSection",
         },
       })
       .exec()
@@ -238,10 +249,12 @@ exports.getFullCourseDetails = async (req, res) => {
 
     let totalDurationInSeconds = 0
     courseDetails.courseContent.forEach((content) => {
-      content.subSection.forEach((subSection) => {
-        const timeDurationInSeconds = parseInt(subSection.timeDuration)
-        totalDurationInSeconds += timeDurationInSeconds
-      })
+      if (content.SubSection && Array.isArray(content.SubSection)) {
+        content.SubSection.forEach((subSection) => {
+          const timeDurationInSeconds = parseInt(subSection.timeDuration || 0)
+          totalDurationInSeconds += timeDurationInSeconds
+        })
+      }
     })
 
     const totalDuration = convertSecondsToDuration(totalDurationInSeconds)
@@ -257,13 +270,13 @@ exports.getFullCourseDetails = async (req, res) => {
       },
     })
   } catch (error) {
+    console.error("ERROR in getFullCourseDetails:", error)
     return res.status(500).json({
       success: false,
       message: error.message,
     })
   }
 }
-
 
 // edit course 
 exports.editCourse = async (req, res) => {
@@ -334,9 +347,6 @@ exports.editCourse = async (req, res) => {
   }
 }
 
-
-
-
 //  Get a list of course for a given Instructor 
 exports.getInstructorCourses = async (req, res) => {
     try {
@@ -362,8 +372,6 @@ exports.getInstructorCourses = async (req, res) => {
       })
     }
   }
-
-
 
   // Delete the Course
   exports.deleteCourse = async (req, res) => {

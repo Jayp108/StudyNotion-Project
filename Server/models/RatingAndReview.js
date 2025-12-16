@@ -24,4 +24,4 @@
 
  });
 
- module.exports = mongoose.model("ratingAndReview", ratingAndReviewSchema); 
+ module.exports = mongoose.model("RatingAndReview", ratingAndReviewSchema); 
