@@ -168,34 +168,83 @@ exports.updateDisplayPicture = async (req, res) => {
   exports.getEnrolledCourses = async (req, res) => {
     try {
       const userId = req.user.id
-      let userDetails = await User.findOne({
-        _id: userId,
-      })
+      console.log("Fetching enrolled courses for user:", userId)
+      console.log("User ID type:", typeof userId)
+      
+      // Try to find user with and without ObjectId conversion
+      let userDetails = await User.findById(userId)
+      console.log("User found with findById:", userDetails ? "Yes" : "No")
+      
+      if (!userDetails) {
+        // Try with ObjectId conversion
+        const mongoose = require('mongoose')
+        userDetails = await User.findOne({ _id: new mongoose.Types.ObjectId(userId) })
+        console.log("User found with ObjectId conversion:", userDetails ? "Yes" : "No")
+      }
+      
+      if (!userDetails) {
+        console.log("ERROR: User not found with id:", userId)
+        return res.status(400).json({
+          success: false,
+          message: `Could not find user with id: ${userId}`,
+        })
+      }
+      
+      // Now populate the courses
+      userDetails = await User.findById(userId)
         .populate({
           path: "courses",
           populate: {
             path: "courseContent",
             populate: {
-              path: "subSection",
+              path: "SubSection",
             },
           },
         })
         .exec()
+      
+      console.log("User details fetched:", userDetails ? "Found" : "Not found")
+      
+      if (!userDetails) {
+        console.log("ERROR: User not found with id:", userId)
+        return res.status(400).json({
+          success: false,
+          message: `Could not find user with id: ${userId}`,
+        })
+      }
+      
+      console.log("User courses found:", userDetails?.courses?.length || 0)
       userDetails = userDetails.toObject()
+      
+      // If no courses, return empty array
+      if (!userDetails.courses || userDetails.courses.length === 0) {
+        return res.status(200).json({
+          success: true,
+          data: [],
+        })
+      }
+      
       var SubsectionLength = 0
       for (var i = 0; i < userDetails.courses.length; i++) {
         let totalDurationInSeconds = 0
         SubsectionLength = 0
-        for (var j = 0; j < userDetails.courses[i].courseContent.length; j++) {
-          totalDurationInSeconds += userDetails.courses[i].courseContent[
-            j
-          ].subSection.reduce((acc, curr) => acc + parseInt(curr.timeDuration), 0)
-          userDetails.courses[i].totalDuration = convertSecondsToDuration(
-            totalDurationInSeconds
-          )
-          SubsectionLength +=
-            userDetails.courses[i].courseContent[j].subSection.length
+        
+        // Check if courseContent exists
+        if (userDetails.courses[i].courseContent && Array.isArray(userDetails.courses[i].courseContent)) {
+          for (var j = 0; j < userDetails.courses[i].courseContent.length; j++) {
+            if (userDetails.courses[i].courseContent[j].SubSection && Array.isArray(userDetails.courses[i].courseContent[j].SubSection)) {
+              totalDurationInSeconds += userDetails.courses[i].courseContent[
+                j
+              ].SubSection.reduce((acc, curr) => acc + parseInt(curr.timeDuration || 0), 0)
+              SubsectionLength +=
+                userDetails.courses[i].courseContent[j].SubSection.length
+            }
+          }
         }
+        
+        userDetails.courses[i].totalDuration = convertSecondsToDuration(
+          totalDurationInSeconds
+        )
         let courseProgressCount = await CourseProgress.findOne({
           courseID: userDetails.courses[i]._id,
           userId: userId,
@@ -212,18 +261,13 @@ exports.updateDisplayPicture = async (req, res) => {
             ) / multiplier
         }
       }
-  
-      if (!userDetails) {
-        return res.status(400).json({
-          success: false,
-          message: `Could not find user with id: ${userDetails}`,
-        })
-      }
+      
       return res.status(200).json({
         success: true,
         data: userDetails.courses,
       })
     } catch (error) {
+      console.error("ERROR in getEnrolledCourses:", error)
       return res.status(500).json({
         success: false,
         message: error.message,
@@ -234,10 +278,12 @@ exports.updateDisplayPicture = async (req, res) => {
   //
   exports.instructorDashboard = async (req, res) => {
     try {
+      console.log("Instructor Dashboard - User ID:", req.user.id);
       const courseDetails = await Course.find({ instructor: req.user.id })
+      console.log("Found courses:", courseDetails.length);
   
       const courseData = courseDetails.map((course) => {
-        const totalStudentsEnrolled = course.studentsEnroled.length
+        const totalStudentsEnrolled = course.studentsEnrolled?.length || 0
         const totalAmountGenerated = totalStudentsEnrolled * course.price
   
         // Create a new object with the additional fields
@@ -245,7 +291,6 @@ exports.updateDisplayPicture = async (req, res) => {
           _id: course._id,
           courseName: course.courseName,
           courseDescription: course.courseDescription,
-          // Include other course properties as needed
           totalStudentsEnrolled,
           totalAmountGenerated,
         }
@@ -253,10 +298,10 @@ exports.updateDisplayPicture = async (req, res) => {
         return courseDataWithStats
       })
   
-      res.status(200).json({ courses: courseData })
+      res.status(200).json({ success: true, courses: courseData })
     } catch (error) {
-      console.error(error)
-      res.status(500).json({ message: "Server Error" })
+      console.error("Instructor Dashboard Error:", error)
+      res.status(500).json({ success: false, message: "Server Error" })
     }
   }
 
